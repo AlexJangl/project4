@@ -42,7 +42,7 @@ void AppendToFile(const std::string& filePath, const std::vector<unsigned char>&
 void PasswordToKey(std::string& password)
 {
     const EVP_MD* dgst = EVP_get_digestbyname("md5");
-    if (!dgst)
+     if (!dgst)
     {
         throw std::runtime_error("no such digest");
     }
@@ -111,17 +111,58 @@ void Encrypt()
 
     AppendToFile("chipher_text", hash);
 }
+std::vector<unsigned char> DecryptAes(const std::vector<unsigned char> chipherText )
+{
+    std::vector<unsigned char> plainText;
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
+
+    std::vector<unsigned char> plainTextBuf(chipherText.size() + AES_BLOCK_SIZE);
+    int plainTextSize = 0;
+    EVP_DecryptUpdate(ctx, &plainTextBuf[0], &plainTextSize, &chipherText[0], chipherText.size() - 32);
+    int lastPartLen = 0;
+    EVP_DecryptFinal_ex(ctx, &plainTextBuf[0] + plainTextSize, &lastPartLen);
+
+    plainTextSize += lastPartLen;
+    plainTextBuf.erase(plainTextBuf.begin() + plainTextSize, plainTextBuf.end());
+
+    plainText.swap(plainTextBuf);
+
+    EVP_CIPHER_CTX_free(ctx);
+    return plainText;
+}
+void Decrypt()
+{
+    std::vector<unsigned char> chipherText;
+    ReadFile("chipher_text", chipherText);
+
+    std::vector<unsigned char> hash;
+    CalculateHash(chipherText, hash);
+
+    //std::vector<unsigned char> chipherText;
+    std::vector<unsigned char> plainText=DecryptAes(chipherText);
+
+    WriteFile("plain_text", plainText);
+
+    AppendToFile("plain_text", hash);
+}
 
 int main()
 {
-    std::string pass = "pass";
+   OpenSSL_add_all_algorithms();
+   std::string pass = "pass";
+   PasswordToKey(pass);
+
     try
     {
         PasswordToKey(pass);
-        Encrypt();
+        //Encrypt();
+        Decrypt();
+
     }
     catch (const std::runtime_error& ex)
     {
         std::cerr << ex.what();
     }
+   
 }
